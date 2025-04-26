@@ -49,6 +49,14 @@ func main() {
 		fmt.Println(path)
 		if path == "/" {
 			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		} else if strings.Contains(path, "echo") {
+			responseData := strings.Split(path, "/")[2]
+			response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(responseData), responseData)
+			if err != nil {
+				fmt.Println("Error formatting data.", err.Error())
+				os.Exit(1)
+			}
+			conn.Write([]byte(response))
 		} else {
 			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 		}
