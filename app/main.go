@@ -4,21 +4,19 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 // Ensures gofmt doesn't remove the "net" and "os" imports above (feel free to remove this!)
-var _ = net.Listen
-var _ = os.Exit
+// var _ = net.Listen
+// var _ = os.Exit
 
 func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
-
-	// Uncomment this block to pass the first stage
+	fmt.Println("Starting the server at port 4221.")
 
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
 	if err != nil {
-		fmt.Println("Failed to bind to port 4221")
+		fmt.Println("Failed to bind to port 4221.")
 		os.Exit(1)
 	}
 
@@ -28,5 +26,37 @@ func main() {
 		os.Exit(1)
 	}
 
-	conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+	var data = make([]byte, 1024)
+
+	totalBytesRead, err := conn.Read(data)
+	if err != nil {
+		fmt.Println("Error reading data.", err.Error())
+		os.Exit(1)
+	}
+
+	request := string(data)
+	fmt.Println("Total bytes read: ", totalBytesRead)
+	fmt.Println("`request` size (in bytes): ", len(request))
+	fmt.Println(request)
+
+	lines := strings.Split(request, "\r\n")
+
+	if len(lines) > 0 {
+		firstHeader := lines[0]
+		fmt.Println(firstHeader)
+		res := strings.Split(firstHeader, " ")
+		path := res[1]
+		fmt.Println(path)
+		if path == "/" {
+			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+		} else {
+			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+		}
+
+	}
+
+	// conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+
+	// fmt.Println("No data sent. Closing connection.")
+	// conn.Close()
 }
