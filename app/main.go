@@ -19,10 +19,11 @@ func handleRequest(conn net.Conn, directoryPath string) {
 		os.Exit(1)
 	}
 
-	request := string(data)
+	// WARN: this is critical to only take the actual bytes read
+	request := string(data[:totalBytesRead])
 	fmt.Println("Total bytes read: ", totalBytesRead)
 	fmt.Println("`request` size (in bytes): ", len(request))
-	fmt.Println(request)
+	fmt.Println("Request:\n\n", request)
 
 	lines := strings.Split(request, "\r\n")
 
@@ -31,12 +32,11 @@ func handleRequest(conn net.Conn, directoryPath string) {
 		fmt.Println(firstHeader)
 		res := strings.Fields(firstHeader)
 		path := res[1]
-		fmt.Println("path: ", path)
+		// fmt.Println("path: ", path)
 		// for idx, line := range lines {
 		// 	fmt.Printf("line %d: \n--------------------\n%s\n--------------------\n", idx, line)
 		// }
 
-		// Handle root path
 		if path == "/" {
 			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 		} else if strings.Contains(path, "echo") {
@@ -64,27 +64,73 @@ func handleRequest(conn net.Conn, directoryPath string) {
 			}
 
 		} else if strings.Contains(path, "files") {
-
+			fmt.Println("Inside `files` path:", res)
 			filename := strings.Split(path, "/")[2]
 			filepath := filepath.Join(directoryPath, filename)
-			fmt.Println(filename)
-			fmt.Println(filepath)
-			fileContent, err := readFile(filepath)
-			if err != nil {
-				conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+
+			if res[0] == "GET" {
+				fileContent, err := readFile(filepath)
+				if err != nil {
+					conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+				}
+				response := fmt.Sprintf(
+					"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s",
+					len(fileContent),
+					fileContent,
+				)
+				conn.Write([]byte(response))
+
+			} else {
+				// TODO:
+				// 1. [X] check if file exists
+				// 2. [X] create file
+				// 3. [X] return response (error or 201/created)
+
+				fmt.Println("POST method received!!")
+				fileExists := checkFileExists(filepath)
+				if !fileExists {
+
+					payloadData, err := extractPayloadData(lines)
+					if err != nil {
+						conn.Write([]byte("HTTP/1.1 400 Error extracting payload\r\n\r\n"))
+						return
+					}
+					err = createFile(filepath, []byte(payloadData))
+					fmt.Println("extracted payload data: ", payloadData)
+					if err != nil {
+						conn.Write([]byte("HTTP/1.1 400 Error writing data\r\n\r\n"))
+					}
+					conn.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
+
+				} else {
+					// TODO: return appropriate response
+					conn.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
+				}
+
 			}
-			response := fmt.Sprintf(
-				"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s",
-				len(fileContent),
-				fileContent,
-			)
-			conn.Write([]byte(response))
 
 		} else {
 			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 		}
 	}
 
+}
+
+func extractPayloadData(lines []string) (string, error) {
+	// last line is the payload data
+	lastLine := lines[len(lines)-1]
+	// WARN: Trim any excess null bytes (\x00)
+	trimmedPayload := strings.TrimRight(lastLine, "\x00")
+	fmt.Println("Extracted and trimmed payload data:", trimmedPayload)
+	return trimmedPayload, nil
+}
+
+func checkFileExists(filepath string) bool {
+	_, err := os.Stat(filepath)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return err == nil
 }
 
 func readFile(filepath string) ([]byte, error) {
@@ -96,6 +142,18 @@ func readFile(filepath string) ([]byte, error) {
 	fmt.Print(string(dat))
 
 	return dat, nil
+}
+
+func createFile(filepath string, data []byte) error {
+	// TODO:
+	// 1. [X] write file
+	// 2. [X] return response (error or nil)
+	err := os.WriteFile(filepath, data, 0644)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Data saved!")
+	return nil
 }
 
 func main() {
