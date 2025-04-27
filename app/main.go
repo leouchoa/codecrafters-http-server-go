@@ -7,21 +7,8 @@ import (
 	"strings"
 )
 
-func main() {
-	fmt.Println("Starting the server at port 4221.")
-
-	l, err := net.Listen("tcp", "0.0.0.0:4221")
-	if err != nil {
-		fmt.Println("Failed to bind to port 4221.")
-		os.Exit(1)
-	}
-
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
-	}
-
+func handleRequest(conn net.Conn) {
+	defer conn.Close()
 	var data = make([]byte, 1024)
 
 	totalBytesRead, err := conn.Read(data)
@@ -79,5 +66,31 @@ func main() {
 		}
 	}
 
-	conn.Close()
+}
+
+func main() {
+	fmt.Println("Starting the server at port 4221.")
+
+	l, err := net.Listen("tcp", "0.0.0.0:4221")
+	if err != nil {
+		fmt.Println("Failed to bind to port 4221.")
+		os.Exit(1)
+	}
+	defer l.Close()
+
+	for {
+		// NOTE: this part is synchronous and waits for connections.
+		// It's what allows the loop to wait until further notice.
+		conn, err := l.Accept()
+		if err != nil {
+			fmt.Println("Error accepting a connection: ", err.Error())
+			// NOTE: this is what allows us to continue accepting other connections.
+			continue
+		}
+
+		// handle the request asynchronously.
+		go handleRequest(conn)
+
+	}
+
 }
