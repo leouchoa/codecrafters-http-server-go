@@ -1,13 +1,15 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
-func handleRequest(conn net.Conn) {
+func handleRequest(conn net.Conn, directoryPath string) {
 	defer conn.Close()
 	var data = make([]byte, 1024)
 
@@ -61,6 +63,23 @@ func handleRequest(conn net.Conn) {
 				conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
 			}
 
+		} else if strings.Contains(path, "files") {
+
+			filename := strings.Split(path, "/")[2]
+			filepath := filepath.Join(directoryPath, filename)
+			fmt.Println(filename)
+			fmt.Println(filepath)
+			fileContent, err := readFile(filepath)
+			if err != nil {
+				conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			}
+			response := fmt.Sprintf(
+				"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n%s",
+				len(fileContent),
+				fileContent,
+			)
+			conn.Write([]byte(response))
+
 		} else {
 			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 		}
@@ -68,7 +87,23 @@ func handleRequest(conn net.Conn) {
 
 }
 
+func readFile(filepath string) ([]byte, error) {
+	dat, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Print(string(dat))
+
+	return dat, nil
+}
+
 func main() {
+	var directoryPath string
+	flag.StringVar(&directoryPath, "directory", "tmp", "directory where files live")
+
+	flag.Parse()
+
 	fmt.Println("Starting the server at port 4221.")
 
 	l, err := net.Listen("tcp", "0.0.0.0:4221")
@@ -89,7 +124,7 @@ func main() {
 		}
 
 		// handle the request asynchronously.
-		go handleRequest(conn)
+		go handleRequest(conn, directoryPath)
 
 	}
 
