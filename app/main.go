@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"flag"
 	"fmt"
 	"net"
@@ -57,8 +59,22 @@ func handleRequest(conn net.Conn, directoryPath string) {
 				conn.Write([]byte(response))
 			} else if strings.Contains(encodingType, "gzip") {
 				responseData := strings.Split(path, "/")[2]
-				response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n%s", len(responseData), responseData)
+				compressedData, err := compressGzip(responseData)
+				if err != nil {
+					conn.Write([]byte(fmt.Sprintf("HTTP/1.1 500 Internal Server Error\r\n\r\n%s", err.Error())))
+					return
+				}
+
+				// NOTE: Using `compressedData.Len()` because it's the length of
+				// the already compressed data.
+				compressedDataSize := compressedData.Len()
+				response := fmt.Sprintf(
+					"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n",
+					compressedDataSize)
+
+				// NOTE: Write the header and then the compressed data
 				conn.Write([]byte(response))
+				conn.Write(compressedData.Bytes())
 			} else {
 				responseData := strings.Split(path, "/")[2]
 				response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(responseData), responseData)
@@ -134,6 +150,22 @@ func handleRequest(conn net.Conn, directoryPath string) {
 		}
 	}
 
+}
+
+func compressGzip(data string) (bytes.Buffer, error) {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+
+	_, err := zw.Write([]byte(data))
+	if err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	if err := zw.Close(); err != nil {
+		return bytes.Buffer{}, err
+	}
+
+	return buf, nil
 }
 
 func extractPayloadData(lines []string) (string, error) {
