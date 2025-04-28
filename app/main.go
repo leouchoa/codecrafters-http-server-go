@@ -55,7 +55,7 @@ func handleRequest(conn net.Conn, directoryPath string) {
 				responseData := strings.Split(path, "/")[2]
 				response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(responseData), responseData)
 				conn.Write([]byte(response))
-			} else if encodingType == "gzip" {
+			} else if strings.Contains(encodingType, "gzip") {
 				responseData := strings.Split(path, "/")[2]
 				response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n%s", len(responseData), responseData)
 				conn.Write([]byte(response))
