@@ -41,9 +41,29 @@ func handleRequest(conn net.Conn, directoryPath string) {
 			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 		} else if strings.Contains(path, "echo") {
 
-			responseData := strings.Split(path, "/")[2]
-			response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(responseData), responseData)
-			conn.Write([]byte(response))
+			var encodingType string
+			for _, line := range lines {
+				if strings.HasPrefix(line, "Accept-Encoding:") {
+
+					encodingType = strings.TrimSpace(strings.TrimPrefix(line, "Accept-Encoding:"))
+					break
+				}
+			}
+
+			fmt.Println(encodingType)
+			if encodingType == "" {
+				responseData := strings.Split(path, "/")[2]
+				response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(responseData), responseData)
+				conn.Write([]byte(response))
+			} else if encodingType == "gzip" {
+				responseData := strings.Split(path, "/")[2]
+				response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n%s", len(responseData), responseData)
+				conn.Write([]byte(response))
+			} else {
+				responseData := strings.Split(path, "/")[2]
+				response := fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: %d\r\n\r\n%s", len(responseData), responseData)
+				conn.Write([]byte(response))
+			}
 
 		} else if strings.Contains(path, "user-agent") {
 
