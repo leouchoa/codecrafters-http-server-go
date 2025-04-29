@@ -34,6 +34,12 @@ func handleRequest(conn net.Conn, directoryPath string) {
 		fmt.Println("`request` size (in bytes): ", len(request))
 		fmt.Println("Request:\n\n", request)
 
+		if checkCloseConnection(request) {
+			conn.Write([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n"))
+			conn.Close()
+			break
+		}
+
 		lines := strings.Split(request, "\r\n")
 
 		if len(lines) > 0 {
@@ -146,7 +152,6 @@ func handleRequest(conn net.Conn, directoryPath string) {
 						conn.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
 
 					} else {
-						// TODO: return appropriate response
 						conn.Write([]byte("HTTP/1.1 201 Created\r\n\r\n"))
 					}
 
@@ -157,6 +162,8 @@ func handleRequest(conn net.Conn, directoryPath string) {
 			}
 		}
 		if checkCloseConnection(request) {
+			conn.Write([]byte("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n"))
+			conn.Close()
 			break
 		}
 	}
